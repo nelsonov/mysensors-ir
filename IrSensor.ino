@@ -44,11 +44,33 @@
 
 // Enable debug prints
 #define MY_DEBUG
+#define MY_BAUD_RATE    9600
+#define MY_NODE_ID      245
 
-// Enable and select radio type attached
-#define MY_RADIO_NRF24
+ /***************nRF24***********************/
+// Default Pinout
+//  GND  <-->   GND     Black
+// 3.3V  <-->   3.3V    Red
+//    9  <-->   CE      Orange
+//   10  <-->   CSN/CS  Yellow
+//   11  <-->   MOSI    Blue
+//   12  <-->   MISO    Violet
+//   13  <-->   SCK     Green
+//    2  <-->   IRQ     Gray  (Optional)
+//#define   MY_RADIO_RF24
+#define   MY_RADIO_NRF24
+#define   MY_RF24_CE_PIN  9   // Default
+#define   MY_RF24_CS_PIN  10  // Default
+//#define   MY_RF24_IRQ_PIN     // OPTIONAL
+//#define   MY_RF24_POWER_PIN   // OPTIONAL
+//#define   MY_RF24_CHANNEL     // OPTIONAL
+//#define   MY_RF24_DATARATE    // OPTIONAL
+#define   MY_RF24_SPI_SPEED   (2*1000000ul)
+//#define   MY_DEBUG_VERBOSE_RF24
+#define   MY_TRANSPORT_UPLINK_CHECK_DISABLED
+/**********END nRF24*************************/
 
-#define MY_NODE_ID      5
+
 
 #include <SPI.h>
 #include <MySensors.h>
@@ -60,7 +82,12 @@
 // Arduino pin to connect the IR receiver to
 int RECV_PIN     = 8;
 
-#define CHILD_ID  2  
+
+
+#define SENDDELAY         1000
+char rgb[7] = "ffffff"; // RGB value.
+
+bool initialValueSent = false;
 
 #define MY_RAWBUF  50
 const char * TYPE2STRING[] = {
@@ -85,6 +112,7 @@ const char * TYPE2STRING[] = {
 #define AddrTxt          F(" addres: 0x")
 #define ValueTxt         F(" value: 0x")
 #define NATxt            F(" - not implemented/found")
+
 
 // Raw or unknown codes requires an Arduino with a larger memory like a MEGA and some changes to store in EEPROM (now max 255 bytes)
 // #define IR_SUPPORT_UNKNOWN_CODES
@@ -136,8 +164,14 @@ IRCode PresetIRCodes[] = {
 #define MAX_PRESET_IR_CODES  (sizeof(PresetIRCodes)/sizeof(IRCode))
 #define MAX_IR_CODES (MAX_STORED_IR_CODES + MAX_PRESET_IR_CODES)
 
-MyMessage msgIrReceive(CHILD_ID, V_IR_RECEIVE);
-MyMessage msgIrRecord(CHILD_ID, V_IR_RECORD); 
+#define RECEIVE_CHILD_ID  1
+#define SEND_CHILD_ID     1
+#define RECORD_CHILD_ID   3
+MyMessage msgIrReceive(RECEIVE_CHILD_ID, V_IR_RECEIVE);
+MyMessage msgIrSend(SEND_CHILD_ID, V_IR_SEND);
+MyMessage msgIrRecord(RECORD_CHILD_ID, V_RGB);
+MyMessage msgIrRecordStat(RECORD_CHILD_ID, V_STATUS);
+
 
 void setup()  
 {  
@@ -156,14 +190,20 @@ void setup()
 void presentation () 
 {
   // Send the sketch version information to the gateway and Controller
-  sendSketchInfo("IR Rec/Playback", "2.0");
+  sendSketchInfo("IR RX/TX", "0.1");
 
   // Register a sensors to gw. Use binary light for test purposes.
-  present(CHILD_ID, S_IR);
+  //present(RECEIVE_CHILD_ID, S_IR);
+  //present(SEND_CHILD_ID, S_IR);
+  present(RECORD_CHILD_ID, S_RGB_LIGHT);
+  
 }
 
 void loop() 
 {
+  if (!initialValueSent) {
+  controller_presentation();
+  }
   if (irrecv.decode(&ircode)) {
       dump(&ircode);
       if (progModeId != NO_PROG_MODE) {
@@ -176,7 +216,8 @@ void loop()
             progModeId = NO_PROG_MODE;
            
             // Tell MYS Controller that we're done recording
-            send(msgIrRecord.set(0));
+            send(msgIrRecordStat.set(0));
+            send(msgIrRecord.set("ffffff"));
          }
       } else {
          // If we are in Playback mode just tell the MYS Controller we did receive an IR code
@@ -201,16 +242,23 @@ void loop()
   }
 }
 
+/************************ receive **************/
 void receive(const MyMessage &message) {
-    //Serial.print(F("New message: "));
-    //Serial.println(message.type);
-   
-   if (message.type == V_IR_RECORD) { // IR_RECORD V_VAR1
+    Serial.print(F("New message: "));
+    Serial.println(message.type);
+
+   if (message.type == V_RGB) { // IR_RECORD V_VAR1
+      String indexstring = message.getString();
+      Serial.println(indexstring);
+      indexstring.toCharArray(rgb, sizeof(rgb));
+      Serial.println(rgb);
+      progModeId = (byte) strtol(rgb, 0, 16);
       // Get IR record requets for index : paramvalue
-      progModeId = message.getByte() % MAX_STORED_IR_CODES;
+      //progModeId = message.getByte() % MAX_STORED_IR_CODES;
       
       // Tell MYS Controller that we're now in recording mode
-      send(msgIrRecord.set(1));
+      send(msgIrRecordStat.set(1));
+      send(msgIrRecord.set(indexstring));
       
       Serial.print(F("Record new IR for: "));
       Serial.println(progModeId);
@@ -230,7 +278,6 @@ void receive(const MyMessage &message) {
    // Start receiving ir again...
    irrecv.enableIRIn(); 
 }
-
 
 byte lookUpPresetCode (decode_results *ircode)
 {
@@ -305,6 +352,7 @@ bool storeRCCode(byte index) {
    Serial.println(ircode.value, HEX);
    return true;
 }
+
 
 void sendRCCode(byte index) {
    IRCode *pIr = ((index <= MAX_STORED_IR_CODES) ? &StoredIRCodes[index % MAX_STORED_IR_CODES] : &PresetIRCodes[index - MAX_STORED_IR_CODES - 1]);
@@ -453,4 +501,18 @@ void recallEeprom(byte len, byte *buf)
     {
        *buf = loadState(i);
     }
+}
+
+void controller_presentation()
+{
+  //send(msgIrReceive.set(0));
+  //wait(SENDDELAY);
+  //send(msgIrSend.set(0));
+  //wait(SENDDELAY);
+  send(msgIrRecordStat.set(0));
+  wait(SENDDELAY);
+  send(msgIrRecord.set(rgb));
+  wait(SENDDELAY);
+  initialValueSent = true;
+  Serial.print("Sent initial values to controller");
 }
