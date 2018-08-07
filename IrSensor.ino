@@ -45,7 +45,7 @@
 // Enable debug prints
 #define MY_DEBUG
 #define MY_BAUD_RATE    9600
-#define MY_NODE_ID      245
+#define MY_NODE_ID      12
 
  /***************nRF24***********************/
 // Default Pinout
@@ -85,7 +85,10 @@ int RECV_PIN     = 8;
 
 
 #define SENDDELAY         1000
+#define HOLDTIME          200
 char rgb[7] = "ffffff"; // RGB value.
+
+#define INACTIVE          254
 
 bool initialValueSent = false;
 
@@ -193,7 +196,7 @@ void presentation ()
   sendSketchInfo("IR RX/TX", "0.1");
 
   // Register a sensors to gw. Use binary light for test purposes.
-  //present(RECEIVE_CHILD_ID, S_IR);
+  present(RECEIVE_CHILD_ID, S_IR);
   //present(SEND_CHILD_ID, S_IR);
   present(RECORD_CHILD_ID, S_RGB_LIGHT);
   
@@ -230,6 +233,8 @@ void loop()
                    Serial.print(F("Found code for preset #"));
                    Serial.println(num);
                    send(msgIrReceive.set(num));
+                   wait(HOLDTIME);
+                   send(msgIrReceive.set(255));
                }
              }
          }
@@ -248,31 +253,29 @@ void receive(const MyMessage &message) {
     Serial.println(message.type);
 
    if (message.type == V_RGB) { // IR_RECORD V_VAR1
-      String indexstring = message.getString();
-      Serial.println(indexstring);
-      indexstring.toCharArray(rgb, sizeof(rgb));
-      Serial.println(rgb);
-      progModeId = (byte) strtol(rgb, 0, 16);
-      // Get IR record requets for index : paramvalue
-      //progModeId = message.getByte() % MAX_STORED_IR_CODES;
+     String indexstring = message.getString();
+     Serial.println(indexstring);
+     indexstring.toCharArray(rgb, sizeof(rgb));
+     Serial.println(rgb);
+     progModeId = (byte) strtol(rgb, 0, 16);
+     // Get IR record requets for index : paramvalue
+     //progModeId = message.getByte() % MAX_STORED_IR_CODES;
+     
+     // Tell MYS Controller that we're now in recording mode
+     send(msgIrRecordStat.set(1));
+     send(msgIrRecord.set(indexstring));
       
-      // Tell MYS Controller that we're now in recording mode
-      send(msgIrRecordStat.set(1));
-      send(msgIrRecord.set(indexstring));
-      
-      Serial.print(F("Record new IR for: "));
-      Serial.println(progModeId);
-   }
-  
-   if (message.type == V_IR_SEND) {
-      // Send an IR code from offset: paramvalue - no check for legal value
-      Serial.print(F("Send IR preset: "));
-      byte code = message.getByte() % MAX_IR_CODES;
-      if (code == 0) {
-        code = MAX_IR_CODES;
-      }
-      Serial.print(code);
-      sendRCCode(code);
+     Serial.print(F("Record new IR for: "));
+     Serial.println(progModeId);
+   } else if (message.type == V_IR_SEND) {
+     // Send an IR code from offset: paramvalue - no check for legal value
+     Serial.print(F("Send IR preset: "));
+     byte code = message.getByte() % MAX_IR_CODES;
+     if (code == 0) {
+       code = MAX_IR_CODES;
+     }
+     Serial.print(code);
+     sendRCCode(code);
    }
 
    // Start receiving ir again...
