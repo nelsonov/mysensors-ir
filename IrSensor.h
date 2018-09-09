@@ -73,5 +73,6 @@ void sendRCCode(byte index);
 void dump(decode_results *results);
 void storeEeprom(byte len, byte *buf);
 void recallEeprom(byte len, byte *buf);
+void ircode_process(decode_results ircode);
 
 #endif // IrSensor_h

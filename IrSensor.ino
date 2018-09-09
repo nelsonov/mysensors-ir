@@ -122,45 +122,10 @@ void controller_presentation()
 void loop() 
 {
   if (!initialValueSent) {
-  controller_presentation();
+    controller_presentation();
   }
   if (irrecv.decode(&ircode)) {
-      dump(&ircode);
-      if (progModeId != NO_PROG_MODE) {
-         // If we are in PROG mode (Recording) store the new IR code and end PROG mode
-         if (storeRCCode(progModeId)) {
-            Serial.println(F("Stored "));
-          
-            // If sucessfull RC decode and storage --> also update the EEPROM
-            storeEeprom(sizeof(StoredIRCodes), (byte *)&StoredIRCodes);
-            progModeId = NO_PROG_MODE;
-           
-            // Tell MYS Controller that we're done recording
-            send(msgIrRecordStat.set(0));
-            send(msgIrRecord.set("ffffff"));
-         }
-      } else {
-         // If we are in Playback mode just tell the MYS Controller we did receive an IR code
-         if (ircode.decode_type != UNKNOWN) {
-             if (ircode.value != REPEAT) {
-               // Look if we found a stored preset 0 => not found
-               byte num = lookUpPresetCode(&ircode);
-               if (num) {
-                   // Send IR decode result to the MYS Controller
-                   Serial.print(F("Found code for preset #"));
-                   Serial.println(num);
-                   send(msgIrReceive.set(num));
-                   wait(HOLDTIME);
-                   send(msgIrReceive.set(255));
-               }
-             }
-         }
-    }
-    // Wait a while before receive next IR-code (also block MySensors receiver so it will not interfere with a new message)
-    delay(500);
-    
-    // Start receiving again
-    irrecv.resume();
+    ircode_process(ircode);
   }
 }
 
