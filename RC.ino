@@ -30,12 +30,7 @@ void ircode_process(decode_results ircode) {
         }
       }
     }
-  }
-  // Wait a while before receive next IR-code (also block MySensors receiver so it will not interfere with a new message)
-  delay(500);
-    
-  // Start receiving again
-  irrecv.resume();  
+  }  
 }
 
 

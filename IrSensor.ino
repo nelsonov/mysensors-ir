@@ -58,6 +58,7 @@ int RECV_PIN = 8;             // pin for IR receiver
 #define HOLDTIME              200
 #define INACTIVE              254
 #define MAX_STORED_IR_CODES   10
+#define RCDELAY               500
 char rgb[7] = "ffffff";       // RGB value.
 
 
@@ -67,9 +68,9 @@ IRrecv            irrecv(RECV_PIN);
 IRsend            irsend;
 decode_results    ircode;
 #define           NO_PROG_MODE 0xFF
-byte              progModeId       = NO_PROG_MODE;
-
-
+byte              progModeId        = NO_PROG_MODE;
+unsigned long     rcwaiting         = 0;
+boolean           rcpaused          = false;
 #define RECEIVE_CHILD_ID  1
 #define SEND_CHILD_ID     1
 #define RECORD_CHILD_ID   3
@@ -121,11 +122,23 @@ void controller_presentation()
 
 void loop() 
 {
+  //For Home Assistant
   if (!initialValueSent) {
     controller_presentation();
   }
-  if (irrecv.decode(&ircode)) {
-    ircode_process(ircode);
+
+  //Get current timestamp
+  unsigned long now = millis();
+
+  //Rather than using delay() after processing RC input
+  //ignore irrecv for RCDELAY miliseconds
+  if ((rcpaused) && (now > rcwaiting)) {
+    irrecv.resume();
+    rcpaused=false;
+  } else if (irrecv.decode(&ircode)) {
+    ircode_process(ircode); // RC.ino
+    rcpaused=true;
+    rcwaiting = now + RCDELAY;
   }
 }
 
