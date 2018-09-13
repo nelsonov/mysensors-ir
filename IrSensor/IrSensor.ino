@@ -38,15 +38,16 @@
  *    http://arcfn.com
  */
 
+// Enable debug prints
+#define MY_DEBUG
+#define MY_BAUD_RATE    9600
+
 #include "radio.h"
 #include <SPI.h>
 #include <MySensors.h>
 #include <IRremote.h> 
 #include "IrSensor.h"
 
-// Enable debug prints
-#define MY_DEBUG
-#define MY_BAUD_RATE    9600
 
 #define MY_NODE_ID      12
 
@@ -133,10 +134,10 @@ void loop()
   //Rather than using delay() after processing RC input
   //ignore irrecv for RCDELAY miliseconds
   if ((rcpaused) && (now > rcwaiting)) {
-    irrecv.resume();
     rcpaused=false;
   } else if (irrecv.decode(&ircode)) {
     ircode_process(ircode); // RC.ino
+    irrecv.resume(); // resets state, clears ircode
     rcpaused=true;
     rcwaiting = now + RCDELAY;
   }
