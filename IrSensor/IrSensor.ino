@@ -69,16 +69,25 @@ IRrecv            irrecv(RECV_PIN);
 IRsend            irsend;
 decode_results    ircode;
 #define           NO_PROG_MODE 0xFF
-byte              progModeId        = NO_PROG_MODE;
-unsigned long     rcwaiting         = 0;
-boolean           rcpaused          = false;
+byte              progModeId            = NO_PROG_MODE;
+unsigned long     PIRwaiting            = 0;
+unsigned long     rcwaiting             = 0;
+boolean           rcpaused              = false;
+#define           PIR_REFRESH           120000; // milliseconds between reports
+#define           PIRPIN                2       // PIR. Only pin 2 or 3
+volatile int      PIRstate           = false;
+volatile int      PIRprevious          = false;
+
 #define RECEIVE_CHILD_ID  1
 #define SEND_CHILD_ID     1
 #define RECORD_CHILD_ID   3
+#define PIR_CHILD_ID      5
 MyMessage msgIrReceive(RECEIVE_CHILD_ID, V_IR_RECEIVE);
 MyMessage msgIrSend(SEND_CHILD_ID, V_IR_SEND);
 MyMessage msgIrRecord(RECORD_CHILD_ID, V_RGB);
 MyMessage msgIrRecordStat(RECORD_CHILD_ID, V_STATUS);
+MyMessage msgPIR(PIR_CHILD_ID, V_TRIPPED);
+
 
 
 void setup()  
@@ -90,8 +99,12 @@ void setup()
   recallEeprom(sizeof(StoredIRCodes), (byte *)&StoredIRCodes);
 
   // Start the ir receiver
-  irrecv.enableIRIn(); 
+  irrecv.enableIRIn();
   
+  attachInterrupt(digitalPinToInterrupt(PIRPIN), PIRinterrupt, CHANGE);
+
+  PIRprevious = digitalRead(PIRPIN);
+
   Serial.println(F("Init done..."));
 }
 
@@ -104,7 +117,7 @@ void presentation ()
   present(RECEIVE_CHILD_ID, S_IR);
   //present(SEND_CHILD_ID, S_IR);
   present(RECORD_CHILD_ID, S_RGB_LIGHT);
-  
+  present(PIR_CHILD_ID, S_MOTION);
 }
 
 void controller_presentation()
@@ -117,8 +130,10 @@ void controller_presentation()
   wait(SENDDELAY);
   send(msgIrRecord.set(rgb));
   wait(SENDDELAY);
+  send(msgPIR.set(0));
+  wait(SENDDELAY);
   initialValueSent = true;
-  Serial.print("Sent initial values to controller");
+  Serial.println("Sent initial values to controller");
 }
 
 void loop() 
@@ -131,7 +146,20 @@ void loop()
   //Get current timestamp
   unsigned long now = millis();
 
-  //Rather than using delay() after processing RC input
+  if (PIRstate != PIRprevious) {
+    PIRprevious=PIRstate;
+    send(msgPIR.set(PIRstate==HIGH ? 1 : 0));
+    Serial.print("State change, sending: ");
+    Serial.println(msgPIR.getInt());
+    PIRwaiting = now + PIR_REFRESH;
+  } else if ((now > PIRwaiting) || (PIRwaiting==0)) {
+    send(msgPIR.set(PIRstate==HIGH ? 1 : 0));
+    Serial.print("Refreshing state, sending: ");
+    Serial.println(msgPIR.getInt());
+    PIRwaiting = now + PIR_REFRESH;
+  }
+  
+
   //ignore irrecv for RCDELAY miliseconds
   if ((rcpaused) && (now > rcwaiting)) {
     rcpaused=false;
@@ -143,4 +171,7 @@ void loop()
   }
 }
 
+void PIRinterrupt () {
+  PIRstate = digitalRead(PIRPIN);
+}
 
