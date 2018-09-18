@@ -41,6 +41,7 @@
 // Enable debug prints
 #define MY_DEBUG
 #define MY_BAUD_RATE    9600
+#define MY_NODE_ID      12
 
 #include "radio.h"
 #include <SPI.h>
@@ -49,7 +50,6 @@
 #include "IrSensor.h"
 
 
-#define MY_NODE_ID      12
 
 
 //*************** IR Remote Tx/Rx Options*************
@@ -58,7 +58,7 @@ int RECV_PIN = 8;             // pin for IR receiver
 #define SENDDELAY             1000
 #define HOLDTIME              200
 #define INACTIVE              254
-#define MAX_STORED_IR_CODES   10
+#define MAX_STORED_IR_CODES   40
 #define RCDELAY               500
 char rgb[7] = "ffffff";       // RGB value.
 
@@ -79,12 +79,15 @@ volatile int      PIRstate           = false;
 volatile int      PIRprevious          = false;
 
 #define RECEIVE_CHILD_ID  1
-#define SEND_CHILD_ID     1
+#define SEND_CHILD_ID     2
 #define RECORD_CHILD_ID   3
 #define PIR_CHILD_ID      5
 MyMessage msgIrReceive(RECEIVE_CHILD_ID, V_IR_RECEIVE);
 MyMessage msgIrSend(SEND_CHILD_ID, V_IR_SEND);
-MyMessage msgIrRecord(RECORD_CHILD_ID, V_RGB);
+MyMessage msgIrSendLight(SEND_CHILD_ID, V_DIMMER);
+//MyMessage msgIrRecord(RECORD_CHILD_ID, V_CUSTOM);
+MyMessage msgIrRecord(RECORD_CHILD_ID, V_IR_RECORD);
+MyMessage msgIrRecordLight(RECORD_CHILD_ID, V_DIMMER);
 MyMessage msgIrRecordStat(RECORD_CHILD_ID, V_STATUS);
 MyMessage msgPIR(PIR_CHILD_ID, V_TRIPPED);
 
@@ -111,24 +114,26 @@ void setup()
 void presentation () 
 {
   // Send the sketch version information to the gateway and Controller
-  sendSketchInfo("IR RX/TX", "0.1");
+  sendSketchInfo("IR RX/TX", "0.4");
 
   // Register a sensors to gw. Use binary light for test purposes.
   present(RECEIVE_CHILD_ID, S_IR);
-  //present(SEND_CHILD_ID, S_IR);
-  present(RECORD_CHILD_ID, S_RGB_LIGHT);
+  present(SEND_CHILD_ID, S_IR);
+  present(RECORD_CHILD_ID, S_DIMMER);
   present(PIR_CHILD_ID, S_MOTION);
 }
 
 void controller_presentation()
 {
-  //send(msgIrReceive.set(0));
-  //wait(SENDDELAY);
-  //send(msgIrSend.set(0));
-  //wait(SENDDELAY);
-  send(msgIrRecordStat.set(0));
+  send(msgIrReceive.set(1));
   wait(SENDDELAY);
-  send(msgIrRecord.set(rgb));
+  send(msgIrSend.set(1));
+  wait(SENDDELAY);
+  send(msgIrSendLight.set(1));
+  wait(SENDDELAY);
+  send(msgIrRecordLight.set(1));
+  wait(SENDDELAY);
+  send(msgIrRecordStat.set(0));
   wait(SENDDELAY);
   send(msgPIR.set(0));
   wait(SENDDELAY);

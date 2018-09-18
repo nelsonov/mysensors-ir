@@ -39,19 +39,22 @@ void receive(const MyMessage &message) {
     Serial.print(F("New message: "));
     Serial.println(message.type);
 
-   if (message.type == V_RGB) { // IR_RECORD V_VAR1
-     String indexstring = message.getString();
-     Serial.println(indexstring);
-     indexstring.toCharArray(rgb, sizeof(rgb));
-     Serial.println(rgb);
-     progModeId = (byte) strtol(rgb, 0, 16);
+   //if (message.type == V_RGB) {
+   if (message.type == V_PERCENTAGE) {
+     //String indexstring = message.getString();
+     //Serial.println(indexstring);
+     //indexstring.toCharArray(rgb, sizeof(rgb));
+     //Serial.println(rgb);
+     //long longval = strtol(rgb, 0, 16);
+     //progModeId = (byte) longval % 256;
+     
      // Get IR record requets for index : paramvalue
-     //progModeId = message.getByte() % MAX_STORED_IR_CODES;
+     progModeId = message.getByte() % MAX_STORED_IR_CODES;
      
      // Tell MYS Controller that we're now in recording mode
      send(msgIrRecordStat.set(1));
-     send(msgIrRecord.set(indexstring));
-      
+     //send(msgIrRecord.set(indexstring));
+     send(msgIrRecord.set(progModeId)); 
      Serial.print(F("Record new IR for: "));
      Serial.println(progModeId);
    } else if (message.type == V_IR_SEND) {
