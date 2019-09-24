@@ -41,7 +41,7 @@
 // Enable debug prints
 #define MY_DEBUG
 #define MY_BAUD_RATE    9600
-#define MY_NODE_ID      12
+#define MY_NODE_ID      13
 
 #include "radio.h"
 #include <SPI.h>
@@ -49,7 +49,7 @@
 #include <IRremote.h> 
 #include "IrSensor.h"
 
-
+#define CURRENTVERSION 0.5
 
 
 //*************** IR Remote Tx/Rx Options*************
@@ -83,13 +83,18 @@ volatile int      PIRprevious          = false;
 #define RECORD_CHILD_ID   3
 #define PIR_CHILD_ID      5
 MyMessage msgIrReceive(RECEIVE_CHILD_ID, V_IR_RECEIVE);
+MyMessage msgIrReceiveTx(RECEIVE_CHILD_ID, V_IR_SEND);
+MyMessage msgIrReceiveStatus(RECEIVE_CHILD_ID, V_STATUS);
 MyMessage msgIrSend(SEND_CHILD_ID, V_IR_SEND);
+MyMessage msgIrSendRx(SEND_CHILD_ID, V_IR_RECEIVE);
 MyMessage msgIrSendLight(SEND_CHILD_ID, V_DIMMER);
+MyMessage msgIrSendStatus(SEND_CHILD_ID, V_STATUS);
 //MyMessage msgIrRecord(RECORD_CHILD_ID, V_CUSTOM);
 MyMessage msgIrRecord(RECORD_CHILD_ID, V_IR_RECORD);
 MyMessage msgIrRecordLight(RECORD_CHILD_ID, V_DIMMER);
 MyMessage msgIrRecordStat(RECORD_CHILD_ID, V_STATUS);
 MyMessage msgPIR(PIR_CHILD_ID, V_TRIPPED);
+MyMessage msgPIRArmed(PIR_CHILD_ID, V_ARMED);
 
 
 
@@ -103,10 +108,12 @@ void setup()
 
   // Start the ir receiver
   irrecv.enableIRIn();
-  
+
   attachInterrupt(digitalPinToInterrupt(PIRPIN), PIRinterrupt, CHANGE);
 
   PIRprevious = digitalRead(PIRPIN);
+
+  controller_presentation();
 
   Serial.println(F("Init done..."));
 }
@@ -114,7 +121,7 @@ void setup()
 void presentation () 
 {
   // Send the sketch version information to the gateway and Controller
-  sendSketchInfo("IR RX/TX", "0.4");
+  sendSketchInfo("IR RX/TX", "CURRENTVERSION");
 
   // Register a sensors to gw. Use binary light for test purposes.
   present(RECEIVE_CHILD_ID, S_IR);
@@ -127,9 +134,17 @@ void controller_presentation()
 {
   send(msgIrReceive.set(1));
   wait(SENDDELAY);
+  send(msgIrReceiveTx.set(UNDEFINED));
+  wait(SENDDELAY);
+  send(msgIrReceiveStatus.set(1));
+  wait(SENDDELAY);
   send(msgIrSend.set(1));
   wait(SENDDELAY);
+  send(msgIrSendRx.set(UNDEFINED));
+  wait(SENDDELAY);
   send(msgIrSendLight.set(1));
+  wait(SENDDELAY);
+  send(msgIrSendStatus.set(1));
   wait(SENDDELAY);
   send(msgIrRecordLight.set(1));
   wait(SENDDELAY);
@@ -137,16 +152,14 @@ void controller_presentation()
   wait(SENDDELAY);
   send(msgPIR.set(0));
   wait(SENDDELAY);
+  send(msgPIRArmed.set(1));
+  wait(SENDDELAY);
   initialValueSent = true;
   Serial.println("Sent initial values to controller");
 }
 
 void loop() 
 {
-  //For Home Assistant
-  if (!initialValueSent) {
-    controller_presentation();
-  }
 
   //Get current timestamp
   unsigned long now = millis();

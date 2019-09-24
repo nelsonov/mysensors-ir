@@ -66,6 +66,8 @@ IRCode PresetIRCodes[] = {
 #define MAX_PRESET_IR_CODES  (sizeof(PresetIRCodes)/sizeof(IRCode))
 #define MAX_IR_CODES (MAX_STORED_IR_CODES + MAX_PRESET_IR_CODES)
 
+const byte UNDEFINED = 255;
+
 void receive(const MyMessage &message);
 byte lookUpPresetCode (decode_results *ircode);
 bool storeRCCode(byte index);

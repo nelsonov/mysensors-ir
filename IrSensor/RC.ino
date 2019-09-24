@@ -26,7 +26,7 @@ void ircode_process(decode_results ircode) {
           Serial.println(num);
           send(msgIrReceive.set(num));
           wait(HOLDTIME);
-          send(msgIrReceive.set(255));
+          send(msgIrReceive.set(UNDEFINED));
         }
       }
     }
