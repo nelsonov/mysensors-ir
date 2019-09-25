@@ -42,6 +42,7 @@
 #define MY_DEBUG
 #define MY_BAUD_RATE    9600
 #define MY_NODE_ID      13
+#define HASS
 
 #include "radio.h"
 #include <SPI.h>
@@ -62,8 +63,6 @@ int RECV_PIN = 8;             // pin for IR receiver
 #define RCDELAY               500
 char rgb[7] = "ffffff";       // RGB value.
 
-
-bool initialValueSent = false;
 IRCode            StoredIRCodes[MAX_STORED_IR_CODES];
 IRrecv            irrecv(RECV_PIN);
 IRsend            irsend;
@@ -83,20 +82,21 @@ volatile int      PIRprevious          = false;
 #define RECORD_CHILD_ID   3
 #define PIR_CHILD_ID      5
 MyMessage msgIrReceive(RECEIVE_CHILD_ID, V_IR_RECEIVE);
-MyMessage msgIrReceiveTx(RECEIVE_CHILD_ID, V_IR_SEND);
-MyMessage msgIrReceiveStatus(RECEIVE_CHILD_ID, V_STATUS);
 MyMessage msgIrSend(SEND_CHILD_ID, V_IR_SEND);
-MyMessage msgIrSendRx(SEND_CHILD_ID, V_IR_RECEIVE);
 MyMessage msgIrSendLight(SEND_CHILD_ID, V_DIMMER);
-MyMessage msgIrSendStatus(SEND_CHILD_ID, V_STATUS);
 //MyMessage msgIrRecord(RECORD_CHILD_ID, V_CUSTOM);
 MyMessage msgIrRecord(RECORD_CHILD_ID, V_IR_RECORD);
 MyMessage msgIrRecordLight(RECORD_CHILD_ID, V_DIMMER);
 MyMessage msgIrRecordStat(RECORD_CHILD_ID, V_STATUS);
 MyMessage msgPIR(PIR_CHILD_ID, V_TRIPPED);
+
+#ifdef HASS
+MyMessage msgIrReceiveTx(RECEIVE_CHILD_ID, V_IR_SEND);
+MyMessage msgIrReceiveStatus(RECEIVE_CHILD_ID, V_STATUS);
+MyMessage msgIrSendRx(SEND_CHILD_ID, V_IR_RECEIVE);
+MyMessage msgIrSendStatus(SEND_CHILD_ID, V_STATUS);
 MyMessage msgPIRArmed(PIR_CHILD_ID, V_ARMED);
-
-
+#endif //HASS
 
 void setup()  
 {  
@@ -113,8 +113,10 @@ void setup()
 
   PIRprevious = digitalRead(PIRPIN);
 
+#ifdef HASS
   controller_presentation();
-
+#endif
+  
   Serial.println(F("Init done..."));
 }
 
@@ -130,6 +132,7 @@ void presentation ()
   present(PIR_CHILD_ID, S_MOTION);
 }
 
+#ifdef HASS
 void controller_presentation()
 {
   send(msgIrReceive.set(1));
@@ -153,10 +156,9 @@ void controller_presentation()
   send(msgPIR.set(0));
   wait(SENDDELAY);
   send(msgPIRArmed.set(1));
-  wait(SENDDELAY);
-  initialValueSent = true;
   Serial.println("Sent initial values to controller");
 }
+#endif //HASS
 
 void loop() 
 {
