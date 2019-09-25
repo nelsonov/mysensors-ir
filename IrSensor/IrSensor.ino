@@ -43,7 +43,7 @@
 #define MY_BAUD_RATE    9600
 #define MY_NODE_ID      13
 #define HASS
-
+#define INCLUDEPIR
 #include "radio.h"
 #include <SPI.h>
 #include <MySensors.h>
@@ -72,15 +72,17 @@ byte              progModeId            = NO_PROG_MODE;
 unsigned long     PIRwaiting            = 0;
 unsigned long     rcwaiting             = 0;
 boolean           rcpaused              = false;
+
+#ifdef INCLUDEPIR
 #define           PIR_REFRESH           120000; // milliseconds between reports
 #define           PIRPIN                2       // PIR. Only pin 2 or 3
 volatile int      PIRstate           = false;
 volatile int      PIRprevious          = false;
+#endif
 
 #define RECEIVE_CHILD_ID  1
 #define SEND_CHILD_ID     2
 #define RECORD_CHILD_ID   3
-#define PIR_CHILD_ID      5
 MyMessage msgIrReceive(RECEIVE_CHILD_ID, V_IR_RECEIVE);
 MyMessage msgIrSend(SEND_CHILD_ID, V_IR_SEND);
 MyMessage msgIrSendLight(SEND_CHILD_ID, V_DIMMER);
@@ -88,7 +90,11 @@ MyMessage msgIrSendLight(SEND_CHILD_ID, V_DIMMER);
 MyMessage msgIrRecord(RECORD_CHILD_ID, V_IR_RECORD);
 MyMessage msgIrRecordLight(RECORD_CHILD_ID, V_DIMMER);
 MyMessage msgIrRecordStat(RECORD_CHILD_ID, V_STATUS);
+
+#ifdef INCLUDEPIR
+#define PIR_CHILD_ID      5
 MyMessage msgPIR(PIR_CHILD_ID, V_TRIPPED);
+#endif
 
 #ifdef HASS
 MyMessage msgIrReceiveTx(RECEIVE_CHILD_ID, V_IR_SEND);
@@ -109,10 +115,11 @@ void setup()
   // Start the ir receiver
   irrecv.enableIRIn();
 
+#ifdef INCLUDEPIR
   attachInterrupt(digitalPinToInterrupt(PIRPIN), PIRinterrupt, CHANGE);
-
   PIRprevious = digitalRead(PIRPIN);
-
+#endif
+  
 #ifdef HASS
   controller_presentation();
 #endif
@@ -129,7 +136,9 @@ void presentation ()
   present(RECEIVE_CHILD_ID, S_IR);
   present(SEND_CHILD_ID, S_IR);
   present(RECORD_CHILD_ID, S_DIMMER);
+#ifdef INCLUDEPIR
   present(PIR_CHILD_ID, S_MOTION);
+#endif
 }
 
 #ifdef HASS
@@ -166,6 +175,7 @@ void loop()
   //Get current timestamp
   unsigned long now = millis();
 
+#ifdef INCLUDEPIR  
   if (PIRstate != PIRprevious) {
     PIRprevious=PIRstate;
     send(msgPIR.set(PIRstate==HIGH ? 1 : 0));
@@ -178,7 +188,7 @@ void loop()
     Serial.println(msgPIR.getInt());
     PIRwaiting = now + PIR_REFRESH;
   }
-  
+#endif //INCLUDEPIR  
 
   //ignore irrecv for RCDELAY miliseconds
   if ((rcpaused) && (now > rcwaiting)) {
@@ -191,7 +201,8 @@ void loop()
   }
 }
 
+#ifdef INCLUDEPIR
 void PIRinterrupt () {
   PIRstate = digitalRead(PIRPIN);
 }
-
+#endif
